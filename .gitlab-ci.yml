@@ -1,0 +1,129 @@
+---
+# GitLab CI/CD Pipeline for Cisco Modeling Lab with Terraform, Ansible, and PyATS
+# File: .gitlab-ci.yml 
+
+stages:
+  - plan
+  - build
+  - configure
+  - test
+  - cleanup
+
+variables:
+  TF_ROOT: ${CI_PROJECT_DIR}/terraform
+  ANSIBLE_ROOT: ${CI_PROJECT_DIR}/ansible
+  ANSIBLE_FORCE_COLOR: 'true'
+
+# Plan Terraform execution
+plan-terraform:
+  stage: plan
+  image: 
+    name: hashicorp/terraform:latest
+    entrypoint: [""]
+  script:
+    - cd ${TF_ROOT}
+    - terraform init
+    - terraform plan -out=tfplan
+  artifacts:
+    paths:
+      - ${TF_ROOT}/tfplan
+#  only:
+#    - main
+#    - merge_requests
+#  tags:
+#    - docker
+
+build-topology:
+  stage: build
+  image: 
+    name: hashicorp/terraform:latest
+    entrypoint: [""]
+  script:
+    - cd ${TF_ROOT}
+    - terraform init
+    - terraform apply -auto-approve tfplan
+    - terraform output -json > ${CI_PROJECT_DIR}/terraform_output.json
+  dependencies:
+    - plan-terraform
+  artifacts:
+    paths:
+      - ${CI_PROJECT_DIR}/terraform_output.json
+      - ${TF_ROOT}/terraform.tfstate
+#  only:
+#    - main
+#  tags:
+#    - docker
+
+# Install Ansible collections and dependencies
+setup-ansible:
+  stage: configure
+  image: python:3.9-slim
+  script:
+    - apt-get update && apt-get install -y sshpass openssh-client
+    - pip install ansible netmiko paramiko cmlutils virl2-client ansible-pylibssh
+    - ansible-galaxy collection install cisco.ios cisco.nxos ansible.netcommon
+    - cd ${ANSIBLE_ROOT}
+    - ansible --version
+  dependencies:
+    - build-topology
+  only:
+    - main
+#  tags:
+#    - docker
+
+configure-network:
+  stage: configure
+  image: python:3.9-slim
+  script:
+    - apt-get update && apt-get install -y sshpass openssh-client
+    - pip install ansible netmiko paramiko pyyaml jinja2 cmlutils virl2-client ansible-pylibssh
+    - ansible-galaxy collection install cisco.ios ansible.netcommon
+    - cd ${ANSIBLE_ROOT}
+    - ansible-playbook -i inv/hosts.ini main.yml -vvv
+  dependencies:
+    - setup-ansible
+  artifacts:
+    paths:
+      - ${ANSIBLE_ROOT}/ansible.cfg
+      - ${ANSIBLE_ROOT}/inv/hosts.ini
+      - ${ANSIBLE_ROOT}/logs/
+  only:
+    - main
+#  tags:
+#    - docker
+
+# Test network configuration with PyATS
+test-network:
+  stage: test
+  image: python:3.9-slim
+  script:
+    - pip install pyats genie tabulate netmiko
+    - cd ${PYATS_ROOT}
+    - easypy run_tests.py -testbed_file testbed.yml
+  dependencies:
+    - configure-network
+  artifacts:
+    paths:
+      - ${PYATS_ROOT}/testbed.yml
+      - ${PYATS_ROOT}/reports/
+  only:
+    - main
+  tags:
+    - docker
+
+cleanup-topology:
+  stage: cleanup
+  image:
+    name: hashicorp/terraform:latest
+    entrypoint: [""]
+  script:
+    - cd ${TF_ROOT}
+    - terraform init
+    - terraform destroy -auto-approve
+  when: manual
+  dependencies:
+    - build-topology
+  only:
+    - main
+  # tags:
+  #   - docker
