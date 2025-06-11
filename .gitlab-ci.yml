@@ -66,8 +66,8 @@ setup-ansible:
     - ansible --version
   dependencies:
     - build-topology
-  only:
-    - main
+#  only:
+#    - main
 #  tags:
 #    - docker
 
@@ -87,8 +87,8 @@ configure-network:
       - ${ANSIBLE_ROOT}/ansible.cfg
       - ${ANSIBLE_ROOT}/inv/hosts.ini
       - ${ANSIBLE_ROOT}/logs/
-  only:
-    - main
+#  only:
+#    - main
 #  tags:
 #    - docker
 
@@ -106,10 +106,10 @@ test-network:
     paths:
       - ${PYATS_ROOT}/testbed.yml
       - ${PYATS_ROOT}/reports/
-  only:
-    - main
-  tags:
-    - docker
+#  only:
+#    - main
+#  tags:
+#    - docker
 
 cleanup-topology:
   stage: cleanup
@@ -123,7 +123,7 @@ cleanup-topology:
   when: manual
   dependencies:
     - build-topology
-  only:
-    - main
-  # tags:
-  #   - docker
+#  only:
+#    - main
+#   tags:
+#     - docker
