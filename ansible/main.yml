@@ -1,0 +1,130 @@
+---
+
+- name: Configure Cat8k
+  hosts: cat
+  gather_facts: no
+  connection: network_cli
+
+  tasks:
+    - name: Create vrf
+      ios_config:
+        lines:
+          - address-family ipv4
+          - exit-address-family
+          - address-family ipv6
+          - exit-address-family
+        parents: vrf definition Mgmt-vrf
+
+    - name: aaa new-model
+      ios_config:
+         lines: aaa new-model
+
+    - name: no ip domain lookup
+      ios_config:
+         lines: no ip domain lookup
+
+    - name: Create aaa group
+      ios_config:
+        lines:
+          - server name sbxtacacs
+        #  - ip vrf forwarding Mgmt-vrf
+          - ip tacacs source-interface GigabitEthernet1
+        parents: aaa group server tacacs+ labtac
+    - name: aaa authentication/authorization login
+      ios_config:
+        commands: 
+          - aaa authentication login default group labtac local
+          - aaa authorization exec default group labtac local
+    - name: Add tacacs server
+      ios_config:
+        lines:
+          - address ipv4 10.20.200.40
+          - key hellocat8
+        parents: tacacs server sbxtacacs
+    - name: Netconf/Restconf/YANG
+      ios_config:
+        lines:
+          - netconf-yang
+          - restconf
+          - yang-interfaces aaa authentication method-list netconf-authn
+          - yang-interfaces aaa authorization method-list netconf-authz
+    - name: AAA local login configs
+      ios_config:
+        lines:
+          - aaa authentication login default group labtac local
+          - aaa authentication login netconf-authn group labtac local
+          - aaa authorization exec default group labtac local if-authenticated
+          - aaa authorization exec netconf-authz group labtac local
+          - aaa authorization commands 1 default group labtac local if-authenticated
+          - aaa authorization commands 15 default group labtac local if-authenticated
+
+- name: Configure NXOS
+  hosts: nxos
+  gather_facts: no
+  connection: network_cli
+  vars:
+    vlans:
+    - Vlan101
+    - Vlan102
+    - Vlan103
+    - Vlan104
+    - Vlan105
+    
+    ip_list:
+    - 172.17.101.2/24
+    - 172.17.102.2/24
+    - 172.17.103.2/24
+    - 172.17.104.2/24
+    - 172.17.105.2/24
+
+    hsrp_ip:
+    - 172.17.101.1
+    - 172.17.102.1
+    - 172.17.103.1
+    - 172.17.104.1
+    - 172.17.105.1
+
+  tasks:
+
+    - name: Show Command
+      cisco.nxos.nxos_command:
+        commands: show version
+      register: version
+
+    - name: Debug[version]
+      debug:
+        var: version
+
+    - name: Debug lists
+      debug:
+        msg: "vlans: {{vlans}}, ip_list: {{ip_list}}, hsrp_ip: {{hsrp_ip}}"
+      tags:
+      - debug
+
+    - name: Applly NX config for VLANS
+      cisco.nxos.nxos_config:
+        lines:
+          - description prod svi
+          - no shutdown
+          - no ip redirects
+          - ip address {{ item.1 }}
+          - no ipv6 redirects
+          - ip router ospf 1 area 0.0.0.0
+#          - hsrp 10
+#          - ip {{item.2}}
+        # parents: int eth1/1
+        parents: interface {{item.0}}
+      loop: "{{ vlans  | zip(ip_list)  | list }}" #| zip(hsrp_ip)
+      tags:
+      - debug
+
+    - name: Applly NX config for VLANS
+      cisco.nxos.nxos_config:
+        lines:
+          - hsrp 10
+          - ip {{item.1}}
+        # parents: int eth1/1
+        parents: interface {{item.0}}
+      loop: "{{ vlans  | zip(hsrp_ip) | list }}" #
+      tags:
+      - hsrp

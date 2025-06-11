@@ -1,0 +1,27 @@
+devices:
+  dev-dist-rtr01:
+    connections:
+      cli:
+        ip: 10.10.20.176
+        protocol: telnet
+    credentials:
+      default:
+        password: cisco
+        username: cisco
+      enable:
+        password: cisco
+    os: iosxe
+    type: iosxe
+  dev-dist-sw01:
+    connections:
+      cli:
+        ip: 10.10.20.178
+        protocol: telnet
+    credentials:
+      default:
+        password: cisco
+        username: cisco
+      enable:
+        password: cisco
+    os: nxos
+    type: nxos
