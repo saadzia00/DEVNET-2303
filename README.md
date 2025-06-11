@@ -1,4 +1,4 @@
-# demo "DEVNET-2303"
+# "DEVNET-2303"
 
 If you want to try to run each step individually, here's the steps
 
