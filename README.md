@@ -11,7 +11,9 @@ terraform plan -out=tfplan
 
 ### Build
 cd DEVNET-2303/terraform
+
 terraform apply -auto-approve tfplan
+
 terraform output -json > ./terraform_output.json
 
 ## Ansible
